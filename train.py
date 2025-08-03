@@ -31,7 +31,7 @@ if subprocess.run("nvidia-smi").returncode:
 import functools
 import os
 import time
-
+from pathlib import Path    
 
 import jax
 import mediapy as media
@@ -61,16 +61,21 @@ def get_ppo_params(env_name, **overrides):
 
 
 def train(
-    ppo_params: dict, save_path: str, seed: int = 1, progress_fn: callable | None = None
+    ppo_params: dict, save_path: str, seed: int = 1, progress_fn: callable = None
 ):
     network_factory = ppo_networks.make_ppo_networks
 
     ppo_training_params = dict(ppo_params)
+
     if "network_factory" in ppo_params:
         del ppo_training_params["network_factory"]
         network_factory = functools.partial(
             ppo_networks.make_ppo_networks, **ppo_params.network_factory
         )
+
+    if progress_fn is None:
+        def progress_fn(*args, **kwargs):
+            pass
 
     train_fn = functools.partial(
         ppo.train,
@@ -84,6 +89,7 @@ def train(
     make_inference_fn, params, metrics = train_fn(
         environment=env,
         wrap_env_fn=wrapper.wrap_for_brax_training,
+
     )
     t1 = time.perf_counter()
     print(f"time to train: {(t1 - t0) / 60:.2f} mins")
@@ -101,6 +107,8 @@ def make_video(
     save_path: str,
     seed: int = 1,
 ):
+
+    save_path = Path(save_path)
     rng = jax.random.PRNGKey(seed)
     rollout = []
     n_episodes = 1
